@@ -1,0 +1,24 @@
+name: Feature request
+description: Suggest a focused MCP capability or workflow.
+title: "feature: "
+labels: ["type: feature"]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: What do you need?
+      description: Describe the workflow this should improve.
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Proposed behavior
+      description: Describe the tool, resource, prompt, or validation behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Constraints
+      description: Mention Gatling version, language, protocol, or build tool.

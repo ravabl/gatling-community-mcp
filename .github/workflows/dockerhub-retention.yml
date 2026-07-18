@@ -1,0 +1,272 @@
+name: Docker Hub Retention
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Exact release version to keep, for example 0.4.0 or v0.4.0
+        required: true
+        type: string
+      minor:
+        description: Minor alias to keep, for example 0.4. Defaults to version without patch.
+        required: false
+        type: string
+      dry_run:
+        description: Print planned deletions without deleting tags or digests.
+        required: true
+        default: true
+        type: boolean
+      extra_delete_digests:
+        description: Optional whitespace/comma separated manifest digests to prune after tag cleanup.
+        required: false
+        type: string
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+      minor:
+        required: false
+        default: ""
+        type: string
+      dry_run:
+        required: true
+        type: boolean
+      extra_delete_digests:
+        required: false
+        default: ""
+        type: string
+    secrets:
+      DOCKERHUB_USERNAME:
+        required: true
+      DOCKERHUB_TOKEN:
+        required: true
+      DOCKERHUB_IMAGE:
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  prune-tags:
+    name: Prune Docker Hub tags and digests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Prune tags and old unreferenced manifests outside the current release
+        shell: bash
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          DOCKERHUB_IMAGE: ${{ secrets.DOCKERHUB_IMAGE }}
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_MINOR: ${{ inputs.minor }}
+          INPUT_DRY_RUN: ${{ inputs.dry_run }}
+          EXTRA_DELETE_DIGESTS: ${{ inputs.extra_delete_digests }}
+        run: |
+          set -euo pipefail
+
+          version="${INPUT_VERSION#v}"
+          minor="$INPUT_MINOR"
+          dry_run="${INPUT_DRY_RUN:-true}"
+          repository="${DOCKERHUB_IMAGE#docker.io/}"
+
+          if [[ -z "$minor" ]]; then
+            minor="${version%.*}"
+          fi
+
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Expected semantic version like 0.4.0, got: $version" >&2
+            exit 1
+          fi
+          if [[ ! "$minor" =~ ^[0-9]+\.[0-9]+$ ]]; then
+            echo "Expected minor version like 0.4, got: $minor" >&2
+            exit 1
+          fi
+          if [[ ! "$repository" =~ ^[^/]+/[^/]+$ ]]; then
+            echo "Expected Docker Hub repository in namespace/name form, got: $repository" >&2
+            exit 1
+          fi
+
+          KEEP_TAGS="$version,$minor,latest"
+          KEEP_DIGESTS="$(mktemp)"
+          CANDIDATE_DIGESTS="$(mktemp)"
+          tags_file="$(mktemp)"
+          manifest_accept="application/vnd.oci.image.index.v1+json,application/vnd.docker.distribution.manifest.list.v2+json,application/vnd.oci.image.manifest.v1+json,application/vnd.docker.distribution.manifest.v2+json"
+
+          echo "Keeping Docker Hub tags: $KEEP_TAGS"
+
+          login_payload="$(jq -nc \
+            --arg username "$DOCKERHUB_USERNAME" \
+            --arg password "$DOCKERHUB_TOKEN" \
+            '{username: $username, password: $password}')"
+          hub_jwt="$(curl -fsS \
+            -H 'Content-Type: application/json' \
+            -d "$login_payload" \
+            https://hub.docker.com/v2/users/login/ | jq -r '.token // empty')"
+
+          registry_token="$(curl -fsS \
+            --user "$DOCKERHUB_USERNAME:$DOCKERHUB_TOKEN" \
+            "https://auth.docker.io/token?service=registry.docker.io&scope=repository:${repository}:pull,push,delete" \
+            | jq -r '.token // empty')"
+
+          if [[ -z "$hub_jwt" ]]; then
+            echo "Docker Hub login did not return a token" >&2
+            exit 1
+          fi
+          if [[ -z "$registry_token" ]]; then
+            echo "Docker Registry login did not return a token" >&2
+            exit 1
+          fi
+
+          collect_manifest_digests() {
+            local reference="$1"
+            local target_file="$2"
+            local headers_file body_file status digest
+            headers_file="$(mktemp)"
+            body_file="$(mktemp)"
+
+            status="$(curl -sS -o "$body_file" -D "$headers_file" -w '%{http_code}' \
+              -H "Authorization: Bearer $registry_token" \
+              -H "Accept: $manifest_accept" \
+              "https://registry-1.docker.io/v2/${repository}/manifests/${reference}")"
+
+            if [[ "$status" == "404" ]]; then
+              echo "Manifest not found for reference: $reference"
+              return 0
+            fi
+            if [[ "$status" != "200" ]]; then
+              echo "Failed to read manifest for $reference, HTTP $status" >&2
+              cat "$body_file" >&2 || true
+              exit 1
+            fi
+
+            digest="$(awk 'tolower($1) == "docker-content-digest:" {print $2}' "$headers_file" | tr -d '\r' | tail -n 1)"
+            if [[ -n "$digest" ]]; then
+              echo "$digest" >> "$target_file"
+            fi
+            jq -r '.manifests[]?.digest // empty' "$body_file" >> "$target_file"
+          }
+
+          should_keep_tag() {
+            local tag="$1"
+            local keep_tag
+            IFS=',' read -ra keep_tags <<< "$KEEP_TAGS"
+            for keep_tag in "${keep_tags[@]}"; do
+              if [[ "$tag" == "$keep_tag" ]]; then
+                return 0
+              fi
+            done
+            return 1
+          }
+
+          should_keep_digest() {
+            local digest="$1"
+            grep -Fxq "$digest" "$KEEP_DIGESTS"
+          }
+
+          page="https://hub.docker.com/v2/repositories/${repository}/tags?page_size=100"
+          while [[ -n "$page" && "$page" != "null" ]]; do
+            response="$(curl -fsS -H "Authorization: JWT $hub_jwt" "$page")"
+            jq -r '.results[].name' <<< "$response" >> "$tags_file"
+            page="$(jq -r '.next // empty' <<< "$response")"
+          done
+
+          while IFS= read -r tag; do
+            [[ -z "$tag" ]] && continue
+            if should_keep_tag "$tag"; then
+              collect_manifest_digests "$tag" "$KEEP_DIGESTS"
+            else
+              collect_manifest_digests "$tag" "$CANDIDATE_DIGESTS"
+            fi
+          done < <(sort -u "$tags_file")
+
+          if [[ -n "${EXTRA_DELETE_DIGESTS:-}" ]]; then
+            tr ',[:space:]' '\n' <<< "$EXTRA_DELETE_DIGESTS" \
+              | grep -E '^sha256:[0-9a-f]{64}$' >> "$CANDIDATE_DIGESTS" || true
+          fi
+
+          awk '!seen[$0]++' "$KEEP_DIGESTS" > "${KEEP_DIGESTS}.uniq"
+          mv "${KEEP_DIGESTS}.uniq" "$KEEP_DIGESTS"
+          awk '!seen[$0]++' "$CANDIDATE_DIGESTS" > "${CANDIDATE_DIGESTS}.uniq"
+          mv "${CANDIDATE_DIGESTS}.uniq" "$CANDIDATE_DIGESTS"
+
+          deleted_tag_count=0
+          kept_tag_count=0
+          while IFS= read -r tag; do
+            [[ -z "$tag" ]] && continue
+
+            if should_keep_tag "$tag"; then
+              echo "Keep tag: $tag"
+              kept_tag_count=$((kept_tag_count + 1))
+              continue
+            fi
+
+            if [[ "$dry_run" == "true" ]]; then
+              echo "Would delete tag: $tag"
+            else
+              encoded_tag="$(jq -rn --arg value "$tag" '$value | @uri')"
+              echo "Delete tag: $tag"
+              curl -fsS -X DELETE \
+                -H "Authorization: JWT $hub_jwt" \
+                "https://hub.docker.com/v2/repositories/${repository}/tags/${encoded_tag}/"
+              deleted_tag_count=$((deleted_tag_count + 1))
+            fi
+          done < <(sort -u "$tags_file")
+
+          deleted_digest_count=0
+          skipped_digest_count=0
+          while IFS= read -r digest; do
+            [[ -z "$digest" ]] && continue
+
+            if should_keep_digest "$digest"; then
+              echo "Keep digest referenced by retained tags: $digest"
+              skipped_digest_count=$((skipped_digest_count + 1))
+              continue
+            fi
+
+            if [[ "$dry_run" == "true" ]]; then
+              echo "Would delete digest: $digest"
+              continue
+            fi
+
+            body_file="$(mktemp)"
+            status="$(curl -sS -o "$body_file" -w '%{http_code}' -X DELETE \
+              -H "Authorization: Bearer $registry_token" \
+              "https://registry-1.docker.io/v2/${repository}/manifests/${digest}")"
+
+            case "$status" in
+              200|202|204)
+                echo "Delete digest: $digest"
+                deleted_digest_count=$((deleted_digest_count + 1))
+                ;;
+              404)
+                echo "Digest already absent: $digest"
+                ;;
+              403)
+                echo "Skip referenced digest: $digest"
+                skipped_digest_count=$((skipped_digest_count + 1))
+                ;;
+              500)
+                echo "Registry accepted digest deletion for background retry or returned transient 500: $digest"
+                deleted_digest_count=$((deleted_digest_count + 1))
+                ;;
+              *)
+                echo "Failed to delete digest $digest, HTTP $status" >&2
+                cat "$body_file" >&2 || true
+                exit 1
+                ;;
+            esac
+          done < "$CANDIDATE_DIGESTS"
+
+          {
+            echo "### Docker Hub retention"
+            echo
+            echo "- Repository: \`$repository\`"
+            echo "- Kept tags: \`$KEEP_TAGS\`"
+            echo "- Dry run: \`$dry_run\`"
+            echo "- Kept tag count: \`$kept_tag_count\`"
+            echo "- Deleted tag count: \`$deleted_tag_count\`"
+            echo "- Deleted digest count: \`$deleted_digest_count\`"
+            echo "- Skipped digest count: \`$skipped_digest_count\`"
+          } >> "$GITHUB_STEP_SUMMARY"

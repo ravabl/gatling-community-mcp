@@ -1,0 +1,236 @@
+{
+  "defaultsByCategory": {
+    "SIMULATION": {
+      "allowedParentContext": "root",
+      "returnType": "Simulation",
+      "chainType": "simulation-root",
+      "requiredPrecedingMethod": "",
+      "incompatibleMethods": [],
+      "compileRiskNotes": "Simulation-level methods define the top-level Gatling simulation class or JS/TS simulation function."
+    },
+    "SCENARIO": {
+      "allowedParentContext": "scenario",
+      "returnType": "ScenarioBuilder-or-ChainBuilder",
+      "chainType": "scenario-chain",
+      "requiredPrecedingMethod": "scenario",
+      "incompatibleMethods": [],
+      "compileRiskNotes": "Scenario methods must be chained from scenario(...) or nested chain builders."
+    },
+    "HTTP_PROTOCOL": {
+      "allowedParentContext": "http-protocol",
+      "returnType": "HttpProtocolBuilder",
+      "chainType": "protocol-chain",
+      "requiredPrecedingMethod": "http",
+      "incompatibleMethods": [],
+      "compileRiskNotes": "Protocol-level methods belong on http.baseUrl(...) setup, not inside request builders."
+    },
+    "HTTP_REQUEST": {
+      "allowedParentContext": "http-request-builder",
+      "returnType": "HttpRequestActionBuilder",
+      "chainType": "request-chain",
+      "requiredPrecedingMethod": "",
+      "incompatibleMethods": [],
+      "compileRiskNotes": "Request methods must be chained on an HTTP request builder; run compile check after generation."
+    },
+    "CHECK": {
+      "allowedParentContext": "check",
+      "returnType": "CheckBuilder",
+      "chainType": "check-chain",
+      "requiredPrecedingMethod": "check",
+      "incompatibleMethods": [],
+      "compileRiskNotes": "Checks must be nested in .check(...); method-chain validation is semantic, not a full compiler."
+    },
+    "CORRELATION": {
+      "allowedParentContext": "check",
+      "returnType": "CheckBuilder",
+      "chainType": "check-chain",
+      "requiredPrecedingMethod": "check",
+      "incompatibleMethods": [],
+      "compileRiskNotes": "Correlation saveAs methods must be inside .check(...) and the saved value must be used after it is captured."
+    },
+    "FEEDER": {
+      "allowedParentContext": "scenario",
+      "returnType": "FeederBuilder-or-ScenarioBuilder",
+      "chainType": "feeder-chain",
+      "requiredPrecedingMethod": "scenario",
+      "incompatibleMethods": [],
+      "compileRiskNotes": "Feeder definitions should match runtime data size and strategy; queue feeders can exhaust."
+    },
+    "CONTROL_FLOW": {
+      "allowedParentContext": "scenario",
+      "returnType": "ChainBuilder",
+      "chainType": "control-flow-chain",
+      "requiredPrecedingMethod": "scenario",
+      "incompatibleMethods": [],
+      "compileRiskNotes": "Control-flow methods wrap chains; nested request builders must remain valid inside the branch or loop."
+    },
+    "INJECTION": {
+      "allowedParentContext": "setUp",
+      "returnType": "PopulationBuilder",
+      "chainType": "injection-chain",
+      "requiredPrecedingMethod": "",
+      "incompatibleMethods": [],
+      "compileRiskNotes": "Injection profiles belong in setUp and should be checked against target load assumptions."
+    },
+    "ASSERTION": {
+      "allowedParentContext": "assertions",
+      "returnType": "Assertion",
+      "chainType": "assertion-chain",
+      "requiredPrecedingMethod": "",
+      "incompatibleMethods": [],
+      "compileRiskNotes": "Assertions belong after setUp/protocols and should cover error rate plus latency percentiles."
+    }
+  },
+  "overrides": [
+    {"method": "simulation", "requiredPrecedingMethod": ""},
+    {"method": "Simulation", "requiredPrecedingMethod": ""},
+    {"method": "scenario", "requiredPrecedingMethod": ""},
+    {"method": "exec", "requiredPrecedingMethod": "scenario"},
+
+    {"method": "http", "requiredPrecedingMethod": ""},
+    {"method": "baseUrl", "requiredPrecedingMethod": "http"},
+    {"method": "acceptHeader", "requiredPrecedingMethod": "http"},
+    {"method": "contentTypeHeader", "requiredPrecedingMethod": "http"},
+    {"method": "enableHttp2", "requiredPrecedingMethod": "http"},
+    {"method": "disableFollowRedirect", "requiredPrecedingMethod": "http"},
+    {"method": "proxy", "requiredPrecedingMethod": "http"},
+    {
+      "method": "httpConcurrentRequests",
+      "requiredPrecedingMethod": "http",
+      "compileRiskNotes": "httpConcurrentRequests is gated by Gatling 3.15+ and belongs on the HTTP protocol builder."
+    },
+
+    {"method": "get", "requiredPrecedingMethod": "http"},
+    {"method": "post", "requiredPrecedingMethod": "http"},
+    {"method": "put", "requiredPrecedingMethod": "http"},
+    {"method": "patch", "requiredPrecedingMethod": "http"},
+    {"method": "delete", "requiredPrecedingMethod": "http"},
+    {"method": "head", "requiredPrecedingMethod": "http"},
+    {"method": "options", "requiredPrecedingMethod": "http"},
+    {"method": "httpRequest", "requiredPrecedingMethod": "http", "compileRiskNotes": "httpRequest is for non-standard HTTP verbs; pass a valid method token and request URL."},
+    {"method": "header", "requiredPrecedingMethod": "http-request"},
+    {"method": "headers.request", "requiredPrecedingMethod": "http-request"},
+    {"method": "header.Authorization", "requiredPrecedingMethod": "http-request"},
+    {"method": "header.Cookie", "requiredPrecedingMethod": "http-request"},
+    {"method": "queryParam", "requiredPrecedingMethod": "http-request"},
+    {"method": "multivaluedQueryParam", "requiredPrecedingMethod": "http-request", "compileRiskNotes": "multivaluedQueryParam requires a collection-compatible value for the selected DSL."},
+    {"method": "queryParamSeq", "requiredPrecedingMethod": "http-request", "compileRiskNotes": "queryParamSeq is unavailable in Gatling JS/TS; use queryParamMap there."},
+    {"method": "queryParamMap", "requiredPrecedingMethod": "http-request"},
+    {"method": "resources", "requiredPrecedingMethod": "http-request"},
+    {"method": "basicAuth", "requiredPrecedingMethod": "http-request"},
+    {"method": "digestAuth", "requiredPrecedingMethod": "http-request", "compileRiskNotes": "digestAuth credentials apply only to this request and should not be embedded as literals in generated source."},
+    {"method": "ignoreProtocolChecks", "requiredPrecedingMethod": "http-request", "compileRiskNotes": "ignoreProtocolChecks disables checks inherited from the HTTP protocol only for this request."},
+    {"method": "requestTimeout", "requiredPrecedingMethod": "http-request", "compileRiskNotes": "requestTimeout overrides the HTTP protocol timeout for this request; use a duration value appropriate for the selected DSL."},
+    {"method": "check", "requiredPrecedingMethod": "http-request"},
+    {
+      "method": "body.StringBody",
+      "requiredPrecedingMethod": "http-request",
+      "incompatibleMethods": ["formParam", "formParamSeq", "formParamMap", "multivaluedFormParam", "bodyPart", "bodyParts"],
+      "compileRiskNotes": "StringBody should not be mixed with form parameters or multipart body parts in one request."
+    },
+    {"method": "body.RawFileBody", "requiredPrecedingMethod": "http-request", "incompatibleMethods": ["formParam", "formParamSeq", "formParamMap", "multivaluedFormParam", "bodyPart", "bodyParts"]},
+    {"method": "body.ElFileBody", "requiredPrecedingMethod": "http-request", "incompatibleMethods": ["formParam", "formParamSeq", "formParamMap", "multivaluedFormParam", "bodyPart", "bodyParts"]},
+    {"method": "body.PebbleFileBody", "requiredPrecedingMethod": "http-request", "incompatibleMethods": ["formParam", "formParamSeq", "formParamMap", "multivaluedFormParam", "bodyPart", "bodyParts"]},
+    {
+      "method": "formParam",
+      "requiredPrecedingMethod": "http-request",
+      "incompatibleMethods": ["body.StringBody", "body.RawFileBody", "body.ElFileBody", "body.PebbleFileBody", "body.InputStreamBody"],
+      "compileRiskNotes": "Form params should not be mixed with raw body definitions in the same request."
+    },
+    {
+      "method": "formParamSeq",
+      "requiredPrecedingMethod": "http-request",
+      "incompatibleMethods": ["body.StringBody", "body.RawFileBody", "body.ElFileBody", "body.PebbleFileBody", "body.InputStreamBody"],
+      "compileRiskNotes": "formParamSeq is unavailable in Gatling JS/TS and should not be mixed with a full request body."
+    },
+    {
+      "method": "formParamMap",
+      "requiredPrecedingMethod": "http-request",
+      "incompatibleMethods": ["body.StringBody", "body.RawFileBody", "body.ElFileBody", "body.PebbleFileBody", "body.InputStreamBody"],
+      "compileRiskNotes": "Form param maps should not be mixed with raw body definitions in the same request."
+    },
+    {
+      "method": "multivaluedFormParam",
+      "requiredPrecedingMethod": "http-request",
+      "incompatibleMethods": ["body.StringBody", "body.RawFileBody", "body.ElFileBody", "body.PebbleFileBody", "body.InputStreamBody"],
+      "compileRiskNotes": "Form params should not be mixed with raw body definitions in the same request."
+    },
+    {"method": "form", "requiredPrecedingMethod": "http-request", "compileRiskNotes": "form reposts a previously captured form; the saved form session key must be available before this request."},
+    {"method": "formUpload", "requiredPrecedingMethod": "http-request", "compileRiskNotes": "formUpload file paths are classpath resources, not relative filesystem paths."},
+    {
+      "method": "bodyPart",
+      "requiredPrecedingMethod": "http-request",
+      "incompatibleMethods": ["body.StringBody", "body.RawFileBody", "body.ElFileBody", "body.PebbleFileBody", "body.InputStreamBody"],
+      "compileRiskNotes": "Multipart body parts can be combined with form parameters but not with a full request body."
+    },
+    {
+      "method": "bodyParts",
+      "requiredPrecedingMethod": "http-request",
+      "incompatibleMethods": ["body.StringBody", "body.RawFileBody", "body.ElFileBody", "body.PebbleFileBody", "body.InputStreamBody"],
+      "compileRiskNotes": "bodyParts can be combined with form parameters but not with a full request body."
+    },
+    {
+      "method": "body.InputStreamBody",
+      "requiredPrecedingMethod": "http-request",
+      "incompatibleMethods": ["body.StringBody", "body.RawFileBody", "body.ElFileBody", "body.PebbleFileBody", "bodyPart", "bodyParts", "formParam", "formParamSeq", "formParamMap", "multivaluedFormParam"],
+      "compileRiskNotes": "InputStreamBody is unavailable in Gatling JS/TS and must not be mixed with another full, multipart, or form request body."
+    },
+    {"method": "processRequestBody", "requiredPrecedingMethod": "http-request", "compileRiskNotes": "processRequestBody is unavailable in Gatling JS/TS and requires a request body compatible with the selected pre-processor."},
+
+    {"method": "status.is", "requiredPrecedingMethod": "check"},
+    {"method": "status.in", "requiredPrecedingMethod": "check"},
+    {"method": "jsonPath.exists", "requiredPrecedingMethod": "check"},
+    {"method": "bodyString", "requiredPrecedingMethod": "check"},
+    {"method": "bodyString.exists", "requiredPrecedingMethod": "check"},
+    {
+      "method": "jsonPath.saveAs",
+      "allowedParentContext": "check",
+      "returnType": "CheckBuilder",
+      "chainType": "check-chain",
+      "requiredPrecedingMethod": "check",
+      "exampleSnippet": "check(jsonPath(\"$.token\").saveAs(\"jwtToken\"))",
+      "compileRiskNotes": "saveAs must be nested inside check(...) and referenced only by later requests."
+    },
+
+    {"method": "csv", "requiredPrecedingMethod": ""},
+    {"method": "ssv", "requiredPrecedingMethod": ""},
+    {"method": "tsv", "requiredPrecedingMethod": ""},
+    {"method": "jsonFile", "requiredPrecedingMethod": ""},
+    {"method": "sitemap", "requiredPrecedingMethod": "", "compileRiskNotes": "sitemap requires the HTTP module import and a classpath or absolute sitemap path."},
+    {"method": "arrayFeeder", "requiredPrecedingMethod": ""},
+    {"method": "listFeeder", "requiredPrecedingMethod": ""},
+    {"method": "jdbcFeeder", "requiredPrecedingMethod": "", "compileRiskNotes": "jdbcFeeder is JVM-only and requires a JDBC driver plus non-embedded credentials."},
+    {"method": "redisFeeder", "requiredPrecedingMethod": "", "compileRiskNotes": "redisFeeder is JVM-only and requires the Gatling Redis module and a configured RedisClientPool."},
+    {"method": "recordsCount", "requiredPrecedingMethod": "feeder-source"},
+    {"method": "feed", "requiredPrecedingMethod": "scenario"},
+    {"method": "circular", "requiredPrecedingMethod": "feeder-source"},
+    {"method": "random", "requiredPrecedingMethod": "feeder-source"},
+    {"method": "queue", "requiredPrecedingMethod": "feeder-source"},
+    {"method": "shuffle", "requiredPrecedingMethod": "feeder-source"},
+
+    {"method": "group", "requiredPrecedingMethod": "scenario"},
+    {"method": "pause", "requiredPrecedingMethod": "scenario"},
+    {"method": "repeat", "requiredPrecedingMethod": "scenario", "compileRiskNotes": "repeat takes an iteration count and wraps a chain; use during for duration-based loops."},
+    {
+      "method": "during",
+      "requiredPrecedingMethod": "scenario",
+      "languageSyntax": {
+        "JAVA": ".during(Duration.ofSeconds(seconds)).on(chain)",
+        "KOTLIN": ".during(Duration.ofSeconds(seconds)).on(chain)",
+        "SCALA": ".during(seconds.seconds).on(chain)",
+        "JAVASCRIPT": ".during(seconds).on(chain)",
+        "TYPESCRIPT": ".during(seconds).on(chain)"
+      },
+      "compileRiskNotes": "during takes a duration, not a repeat count; use repeat(count) for fixed iterations."
+    },
+    {"method": "doIf", "requiredPrecedingMethod": "scenario", "compileRiskNotes": "doIf must be attached to a scenario or chain and should use a real session predicate, not an always-true placeholder."},
+
+    {"method": "rampUsersPerSec", "requiredPrecedingMethod": ""},
+    {"method": "constantUsersPerSec", "requiredPrecedingMethod": ""},
+    {"method": "global.failedRequests.percent.lt", "requiredPrecedingMethod": ""},
+    {"method": "global.responseTime.percentile3.lt", "requiredPrecedingMethod": ""},
+    {"method": "global.responseTime.max.lt", "requiredPrecedingMethod": ""},
+    {"method": "details.responseTime.percentile3.lt", "requiredPrecedingMethod": ""},
+    {"method": "details.requestsPerSec.between", "requiredPrecedingMethod": ""}
+  ]
+}

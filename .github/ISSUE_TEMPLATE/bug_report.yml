@@ -1,0 +1,33 @@
+name: Bug report
+description: Report broken or unsafe behavior.
+title: "bug: "
+labels: ["type: bug"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Describe the broken behavior and the expected result.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How to reproduce
+      description: Include the command, MCP request, or simulation input.
+      placeholder: |
+        1. Run ...
+        2. Call tool ...
+        3. See ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version or image tag
+      placeholder: latest, 0.1.0-snapshot, commit hash
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or output
+      render: text

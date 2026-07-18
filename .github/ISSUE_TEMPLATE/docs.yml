@@ -1,0 +1,19 @@
+name: Documentation
+description: Report unclear, missing, or stale documentation.
+title: "docs: "
+labels: ["type: docs"]
+body:
+  - type: textarea
+    id: page
+    attributes:
+      label: Where is the problem?
+      description: Link or name the file/section.
+    validations:
+      required: true
+  - type: textarea
+    id: fix
+    attributes:
+      label: What should change?
+      description: Describe the clarification or missing example.
+    validations:
+      required: true

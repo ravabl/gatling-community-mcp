@@ -1,0 +1,1 @@
+{"maven": {"minimumForGatling311": "3.6.3"}, "gradle": {"gatling311Command": "gatlingRun --simulation"}, "sbt": {"scalaVersion": "2.13"}}

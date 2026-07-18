@@ -1,0 +1,1 @@
+{"java": {"supportedLts": ["11", "17", "21", "25"], "unsupportedJvm": ["32-bit", "OpenJ9"]}}

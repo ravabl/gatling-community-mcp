@@ -1,0 +1,10 @@
+.git/
+.idea/
+.vscode/
+.DS_Store
+docs/
+CONTRIBUTING.md
+target/
+*.iml
+docs/superpowers/plans/
+docs/superpowers/specs/

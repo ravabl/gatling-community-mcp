@@ -1,0 +1,34 @@
+name: Compatibility
+description: Track Gatling, DSL, protocol, or build-tool compatibility.
+title: "compatibility: "
+labels: ["type: compatibility"]
+body:
+  - type: input
+    id: gatling-version
+    attributes:
+      label: Gatling version
+      placeholder: "3.15"
+    validations:
+      required: true
+  - type: dropdown
+    id: language
+    attributes:
+      label: DSL language
+      options:
+        - Java
+        - Kotlin
+        - Scala
+        - JavaScript
+        - TypeScript
+  - type: input
+    id: build-tool
+    attributes:
+      label: Build tool
+      placeholder: Maven, Gradle, sbt, npm
+  - type: textarea
+    id: detail
+    attributes:
+      label: Compatibility issue
+      description: Explain what should be supported or rejected.
+    validations:
+      required: true

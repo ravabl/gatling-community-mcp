@@ -1,0 +1,10 @@
+target/
+.idea/
+.vscode/
+.DS_Store
+*.iml
+.local-agents/
+.mcp-deploy/
+.superpowers/
+/docs/
+/CONTRIBUTING.md
